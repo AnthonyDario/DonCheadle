@@ -1,4 +1,5 @@
 use native_tls::{TlsConnector, TlsStream};
+use std::fmt;
 use std::io::{Read, Write};
 use std::iter::Iterator;
 use std::net::{TcpStream, ToSocketAddrs}; // TODO: might be not too bad to make a TLS connector?
@@ -9,7 +10,7 @@ fn main() {
     let host = args[1].clone();
 
     let content = get_content(host).expect("NO CONTENT ARRRRG"); // TODO: better error handling
-    println!("{} {}", content.status_code, content.meta);
+    println!("{}", content.header);
     content
         .body
         .expect("test code")
@@ -28,7 +29,7 @@ fn get_content(host: String) -> Result<Response, String> {
     let connector = builder.build().unwrap();
 
     // There should probably only be one socket address returned here?
-    // would want to assert on that
+    // TODO: would want to assert on that
     match url.to_socket_addrs() {
         Ok(mut addr_iter) => match addr_iter.next() {
             Some(addr) => {
@@ -62,8 +63,7 @@ fn get_content(host: String) -> Result<Response, String> {
 // A gemini response details can be found in the gemini spec:
 // https://gemini.circumlunar.space/docs/specification.gmi
 struct Response {
-    status_code: u8,
-    meta: String,
+    header: Header,
     body: Option<Vec<String>>,
 }
 
@@ -73,28 +73,64 @@ impl Response {
         stream
             .read_to_string(&mut content)
             .or_else(|err| Err(format!("{}", err)))?;
-        let lines = content
+        let mut lines = content
             .split("\r\n")
             .map(String::from)
             .collect::<Vec<String>>();
 
-        // The first line of the response is the header with the following format:
-        //<STATUS><SPACE><META><CR><LF>
-        let mut header_iter = lines[0].split_whitespace();
+        Ok(Response {
+            header: Header::parse_header(lines.remove(0))?, // TODO: no clone? we should be able to move this?
+            body: Some(lines),                              // TODO: sometimes there won't be a body
+        })
+    }
+}
+
+enum Header {
+    Input(u8, String),                     // Input prompt
+    Success(u8, String),                   // MIME media type
+    Redirect(u8, String),                  // The Redirect Url
+    TemporaryFailure(u8, String),          // User facing error message
+    PermanentFailure(u8, String),          // User facing error message
+    ClientCertificateRequired(u8, String), // Error message
+}
+
+impl Header {
+    // A gemini header is formatted as: <STATUS><SPACE><META><CR><LF>
+    pub fn parse_header(header: String) -> Result<Header, String> {
+        let mut header_iter = header.split_whitespace();
         let status_code = header_iter
             .next()
             .ok_or("No status code found in header")?
             .parse::<u8>()
             .or_else(|err| Err(format!("{}", err)))?;
-        let header_meta = header_iter
+        let meta = header_iter
             .next()
             .ok_or("No meta found in header")?
             .to_string();
 
-        Ok(Response {
-            status_code: status_code,
-            meta: header_meta,
-            body: Some(lines[1..].to_vec()), // TODO: sometimes there won't be a body
-        })
+        match status_code {
+            10..=19 => Ok(Header::Input(status_code, meta)),
+            20..=29 => Ok(Header::Success(status_code, meta)),
+            30..=39 => Ok(Header::Redirect(status_code, meta)),
+            40..=49 => Ok(Header::TemporaryFailure(status_code, meta)),
+            50..=59 => Ok(Header::PermanentFailure(status_code, meta)),
+            60..=69 => Ok(Header::ClientCertificateRequired(status_code, meta)),
+            _ => Err(format!("Unexpected status code: {}", status_code)),
+        }
+    }
+}
+
+impl fmt::Display for Header {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Is there really not a more succinct way to do this?
+        // Perhaps this means a struct would be better suited than an Enum...
+        match self {
+            Header::Input(code, meta) => write!(f, "{} {}\r\n", code, meta),
+            Header::Success(code, meta) => write!(f, "{} {}\r\n", code, meta),
+            Header::Redirect(code, meta) => write!(f, "{} {}\r\n", code, meta),
+            Header::TemporaryFailure(code, meta) => write!(f, "{} {}\r\n", code, meta),
+            Header::PermanentFailure(code, meta) => write!(f, "{} {}\r\n", code, meta),
+            Header::ClientCertificateRequired(code, meta) => write!(f, "{} {}\r\n", code, meta),
+        }
     }
 }
