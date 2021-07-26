@@ -6,10 +6,21 @@ use std::net::{TcpStream, ToSocketAddrs}; // TODO: might be not too bad to make 
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    // TODO: check the arg length so we don't panic
+
+    if args.len() < 1 {
+        println!("Need to supply a URL");
+        return;
+    }
     let host = args[1].clone();
 
-    let content = get_content(host).expect("NO CONTENT ARRRRG"); // TODO: better error handling
+    let content = match get_content(host) {
+        Ok(c) => c,
+        Err(e) => {
+            println!("Error: {:?}", e);
+            return;
+        }
+    };
+
     println!("{}", content.header);
     content
         .body
@@ -21,19 +32,20 @@ fn main() {
 
 fn get_content(host: String) -> Result<Response, String> {
     let url = format!("{}:1965", host);
-    // TODO: move the TLS stuff into a separate own method
+    // TODO: move the TLS stuff into a separate method
     // TODO: trust certs on first use
     let mut builder = TlsConnector::builder();
     builder.danger_accept_invalid_hostnames(true);
     builder.danger_accept_invalid_certs(true);
     let connector = builder.build().unwrap();
 
-    // There should probably only be one socket address returned here?
-    // TODO: would want to assert on that
     match url.to_socket_addrs() {
         Ok(mut addr_iter) => match addr_iter.next() {
             Some(addr) => {
-                let stream = TcpStream::connect(addr).unwrap(); // TODO: error handling
+                let stream = match TcpStream::connect(addr) {
+                    Ok(s) => s,
+                    Err(e) => return Err(format!("Error with the TCP connection: {:?}", e)),
+                };
                 println!("connected to a stream");
 
                 let tls_stream = connector.connect(&host, stream);
@@ -45,18 +57,12 @@ fn get_content(host: String) -> Result<Response, String> {
                             .unwrap();
                         Response::from(stream)
                     }
-                    Err(e) => {
-                        println!("Error with the TLS connector: {:?}", e);
-                        Err(format!("Error with the TLS connector: {:?}", e))
-                    }
+                    Err(e) => Err(format!("Error with the TLS connector: {:?}", e)),
                 }
             }
             None => Err(String::from("No addresses found")),
         },
-        Err(e) => {
-            println!("Error getting socket addresses: {:?}", e);
-            Err(format!("Error getting socket addresses: {:?}", e))
-        }
+        Err(e) => Err(format!("Error getting socket addresses: {:?}", e)),
     }
 }
 
