@@ -2,7 +2,9 @@ use native_tls::{TlsConnector, TlsStream};
 use std::fmt;
 use std::io::{Read, Write};
 use std::iter::Iterator;
-use std::net::{TcpStream, ToSocketAddrs}; // TODO: might be not too bad to make a TLS connector?
+use std::net::{TcpStream, ToSocketAddrs};
+
+mod uri;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
