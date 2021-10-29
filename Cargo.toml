@@ -1,5 +1,5 @@
 [package]
-name = "gemini-client"
+name = "gemini_client"
 version = "0.1.0"
 authors = ["Anthony Dario <anthonydario@protonmail.com>"]
 edition = "2018"
@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 native-tls = "0.2.7"
+url = "2.2.2"
