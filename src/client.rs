@@ -80,7 +80,6 @@ impl Response {
         stream
             .read_to_string(&mut content)
             .or_else(|err| Err(format!("{}", err)))?;
-        println!("content: {}", content);
         let mut lines = content
             .split("\r\n")
             .map(String::from)

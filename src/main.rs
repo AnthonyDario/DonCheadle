@@ -1,7 +1,9 @@
 use std::io::{stdin, stdout, Write};
 use std::process::exit;
+
 mod client;
-use crate::client::visit_url;
+
+use crate::client::{Response, visit_url};
 
 fn main() {
     println!("Enter q to quit at any time");
@@ -14,7 +16,12 @@ fn main() {
             Ok(_) => {
                 match input.trim() {
                     "q" => exit(1),
-                    _ => parse_input(input),
+                    _ => { 
+                        match parse_input(input) {
+                            Ok(gem_text) => display_input(gem_text),
+                            Err(e) => exit(0),
+                        }
+                    }
                 }
             }
             Err(e) => {
@@ -25,20 +32,22 @@ fn main() {
     }
 }
 
-fn parse_input(input: String) {
+fn parse_input(input: String) -> Result<Response, String> {
 
-    let content = match visit_url(input) {
+    let content = match visit_url(input.clone()) {
         Ok(content) => content,
         Err(e) => {
             println!("Error: {:?}", e);
-            return;
+            return Err(format!("Error visiting url {}: {}", input, e));
         }
     };
+    return Ok(content);
+}
 
-    println!("{}", content.header);
-    content
+fn display_input(input: Response) {
+    input
         .body
-        .expect("test code")
+        .expect("Empty Response")
         .iter()
-        .for_each(|line| println!("{}", line));
+        .for_each(|line| println!("{}", line))
 }
