@@ -1,17 +1,33 @@
+use std::io::{stdin, stdout, Write};
+use std::process::exit;
 mod client;
-
 use crate::client::visit_url;
 
 fn main() {
-    let args: Vec<String> = std::env::args().collect();
-
-    if args.len() < 1 {
-        println!("Need to supply a URL");
-        return;
+    println!("Enter q to quit at any time");
+    println!("Enter a gemini URL to visit that page");
+    loop {
+        print!("Enter URL: ");
+        let mut input = String::new();
+        stdout().flush();
+        match stdin().read_line(&mut input) {
+            Ok(_) => {
+                match input.trim() {
+                    "q" => exit(1),
+                    _ => parse_input(input),
+                }
+            }
+            Err(e) => {
+                println!("Error: {}", e);
+                exit(0);
+            }
+        }
     }
-    let host = args[1].clone();
+}
 
-    let content = match visit_url(host) {
+fn parse_input(input: String) {
+
+    let content = match visit_url(input) {
         Ok(content) => content,
         Err(e) => {
             println!("Error: {:?}", e);
