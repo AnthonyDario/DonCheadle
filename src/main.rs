@@ -5,35 +5,28 @@ mod client;
 
 use crate::client::{Response, visit_url};
 
-fn main() {
-    println!("Enter q to quit at any time");
-    println!("Enter a gemini URL to visit that page");
+fn main() -> std::io::Result<()> {
+    println!("Enter (q) to quit at any time\n\
+              Enter a gemini URL to visit that page");
     loop {
         print!("Enter URL: ");
+        stdout().flush()?;
+
         let mut input = String::new();
-        stdout().flush();
-        match stdin().read_line(&mut input) {
-            Ok(_) => {
-                match input.trim() {
-                    "q" => exit(1),
-                    _ => { 
-                        match parse_input(input) {
-                            Ok(gem_text) => display_input(gem_text),
-                            Err(e) => exit(0),
-                        }
-                    }
+        stdin().read_line(&mut input)?;
+        match input.trim() {
+            "q" => exit(0),
+            _ => { 
+                match get_content(input) {
+                    Ok(gem_text) => display_response(gem_text),
+                    Err(e) => exit_with_error(format!("Error retrieving content: {}", e)),
                 }
-            }
-            Err(e) => {
-                println!("Error: {}", e);
-                exit(0);
             }
         }
     }
 }
 
-fn parse_input(input: String) -> Result<Response, String> {
-
+fn get_content(input: String) -> Result<Response, String> {
     let content = match visit_url(input.clone()) {
         Ok(content) => content,
         Err(e) => {
@@ -44,10 +37,15 @@ fn parse_input(input: String) -> Result<Response, String> {
     return Ok(content);
 }
 
-fn display_input(input: Response) {
-    input
+fn display_response(response: Response) {
+    response
         .body
         .expect("Empty Response")
         .iter()
         .for_each(|line| println!("{}", line))
+}
+
+fn exit_with_error(error_message: String) {
+    println!("{}", error_message);
+    exit(1);
 }
