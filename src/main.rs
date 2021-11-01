@@ -1,8 +1,9 @@
 use std::io::{stdin, stdout, Write};
 use std::process::exit;
 
-mod client;
 mod gemtext;
+mod client;
+mod url;
 
 use crate::client::visit_url;
 use crate::gemtext::GemText;
@@ -29,14 +30,8 @@ fn main() -> std::io::Result<()> {
 }
 
 fn get_content(input: String) -> Result<GemText, String> {
-    let content = match visit_url(input.clone()) {
-        Ok(content) => GemText::from_response(content),
-        Err(e) => {
-            println!("Error: {:?}", e);
-            return Err(format!("Error visiting url {}: {}", input, e));
-        }
-    };
-    return Ok(content);
+    let response = visit_url(input.clone())?;
+    return Ok(GemText::from_response(response)?);
 }
 
 fn display_response(gemtext: GemText) {

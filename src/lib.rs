@@ -1,4 +1,6 @@
 mod client;
+mod gemtext;
+mod url;
 
 use crate::client::visit_url;
 use crate::client::Response;

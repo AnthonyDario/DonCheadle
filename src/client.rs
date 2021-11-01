@@ -5,6 +5,8 @@ use std::iter::Iterator;
 use std::net::TcpStream;
 use url::Url;
 
+use crate::url::parse_url;
+
 pub fn visit_url(mut url_string: String) -> Result<Response, String> {
     let mut content: Response;
 
@@ -19,44 +21,22 @@ pub fn visit_url(mut url_string: String) -> Result<Response, String> {
     return Ok(content);
 }
 
-fn parse_url(url_string: &String) -> Result<Url, String> {
-    let parse_string = if url_string.contains("gemini://") {
-        url_string.clone()
-    } else {
-        format!("gemini://{}", url_string)
-    };
-
-    match Url::parse(parse_string.as_str()) {
-        Ok(mut url) => {
-            if url.set_port(Some(1965)).is_err() {
-                // That's some 1965
-                return Err("Error setting the port".to_string());
-            }
-            Ok(url)
-        }
-        Err(e) => Err(format!("Error parsing Url '{}': {:?}", url_string, e)),
-    }
-}
-
 fn get_content(url: Url) -> Result<Response, String> {
     let mut builder = TlsConnector::builder();
     builder.danger_accept_invalid_hostnames(true);
     builder.danger_accept_invalid_certs(true);
     let connector = builder.build().unwrap();
 
-    println!("{}", url.as_str());
     match url.socket_addrs(|| Some(1965)) {
         Ok(addr_vec) => {
             let stream = match TcpStream::connect(addr_vec[0]) {
                 Ok(s) => s,
                 Err(e) => return Err(format!("Error with the TCP connection: {:?}", e)),
             };
-            println!("connected to a stream");
 
             let tls_stream = connector.connect(&url.host_str().unwrap(), stream);
             match tls_stream {
                 Ok(mut stream) => {
-                    println!("tls connector connected");
                     stream.write_all(format!("{}\r\n", url).as_bytes()).unwrap();
                     Response::from(stream)
                 }
@@ -81,7 +61,7 @@ impl Response {
             .read_to_string(&mut content)
             .or_else(|err| Err(format!("{}", err)))?;
         let mut lines = content
-            .split("\r\n")
+            .split("\n")
             .map(String::from)
             .collect::<Vec<String>>();
 
